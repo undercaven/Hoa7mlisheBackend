@@ -28,7 +28,11 @@ public partial class User
 
     internal UserShortDTO GetShortDto() => new()
     {
-
+        Username = this.Username,
+        Role = this.Role,
+        Mikoins = this.Mikoins,
+        Id = this.Id,
+        AvatarId = this.AvatarId
     };
 
 }
