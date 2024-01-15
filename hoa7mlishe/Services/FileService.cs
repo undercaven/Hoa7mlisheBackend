@@ -27,6 +27,7 @@ namespace hoa7mlishe.Services
         /// </summary>
         /// <param name="id">ИД файла</param>
         /// <param name="height">Высота в пикселях</param>
+        /// <param name="extension">Расширение файла</param>
         /// <returns>Байты файла</returns>
         public byte[] GetFileBytes(
             Guid id, int height, ref string extension)
@@ -129,6 +130,13 @@ namespace hoa7mlishe.Services
             return fileInfo.Id;
         }
 
+        /// <summary>
+        /// Сохраняет файл и создает запись в файловой таблице
+        /// </summary>
+        /// <param name="file">Файл</param>
+        /// <param name="imgHeight">Высота изображения</param>
+        /// <param name="filename">Имя файла</param>
+        /// <returns>Идентификатор записи</returns>
         public Guid SaveInFileTable(IFormFile file, int imgHeight = 0, string filename = null)
         {
             Guid guid = Guid.NewGuid();
@@ -174,6 +182,10 @@ namespace hoa7mlishe.Services
             return fileRecord.RecordId;
         }
 
+        /// <summary>
+        /// Удаляет файл и запись в файловой таблице
+        /// </summary>
+        /// <param name="fileId">Идентификатор записи</param>
         public void DeleteFile(Guid fileId)
         {
             var fileInterface = _context.FileInterfaces.FirstOrDefault(x => x.RecordId == fileId);
@@ -216,42 +228,43 @@ namespace hoa7mlishe.Services
             var width = sourceBitmap.Width;
             var height = sourceBitmap.Height;
 
-            using (var temporaryBitmap = new Bitmap(width, height, PixelFormat.Format24bppRgb))
+            using var temporaryBitmap = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+            using (var graphics = Graphics.FromImage(temporaryBitmap))
             {
-                using (var graphics = Graphics.FromImage(temporaryBitmap))
-                {
-                    graphics.DrawImageUnscaled(sourceBitmap, 0, 0);
-                }
-
-                // Lock the bitmap's bits.
-                var bmpData = temporaryBitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, temporaryBitmap.PixelFormat);
-
-                // Get the address of the first line.
-                var ptr = bmpData.Scan0;
-
-                var result = new Pixel[width, height];
-
-                byte* rgb = (byte*)ptr.ToPointer();
-                for (var y = 0; y < height; y++)
-                {
-                    var index = bmpData.Stride * y;
-
-                    for (var x = 0; x < width; x++)
-                    {
-                        ref var res = ref result[x, y];
-                        res.Blue = MathUtils.SRgbToLinear(rgb[index++]);
-                        res.Green = MathUtils.SRgbToLinear(rgb[index++]);
-                        res.Red = MathUtils.SRgbToLinear(rgb[index++]);
-                    }
-                }
-
-                temporaryBitmap.UnlockBits(bmpData);
-
-                return result;
+                graphics.DrawImageUnscaled(sourceBitmap, 0, 0);
             }
+
+            // Lock the bitmap's bits.
+            var bmpData = temporaryBitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, temporaryBitmap.PixelFormat);
+
+            // Get the address of the first line.
+            var ptr = bmpData.Scan0;
+
+            var result = new Pixel[width, height];
+
+            byte* rgb = (byte*)ptr.ToPointer();
+            for (var y = 0; y < height; y++)
+            {
+                var index = bmpData.Stride * y;
+
+                for (var x = 0; x < width; x++)
+                {
+                    ref var res = ref result[x, y];
+                    res.Blue = MathUtils.SRgbToLinear(rgb[index++]);
+                    res.Green = MathUtils.SRgbToLinear(rgb[index++]);
+                    res.Red = MathUtils.SRgbToLinear(rgb[index++]);
+                }
+            }
+
+            temporaryBitmap.UnlockBits(bmpData);
+
+            return result;
         }
 
-        
+        /// <summary>
+        /// Создает пак карточек
+        /// </summary>
+        /// <param name="packDto">Модель пака</param>
         public void CreatePack(CardPackPostDTO packDto)
         {
             Guid fileId = SaveInFileTable(packDto.CoverImage);
@@ -259,10 +272,9 @@ namespace hoa7mlishe.Services
             using (MemoryStream ms = new())
             {
                 packDto.CoverImage.CopyTo(ms);
-                using (Image coverImg = Image.FromStream(ms))
-                {
-                    previewHash = GetPreviewHash(coverImg);
-                }
+
+                using Image coverImg = Image.FromStream(ms);
+                previewHash = GetPreviewHash(coverImg);
             }
 
             string[] chances = packDto.CardDistribution.Split(';');

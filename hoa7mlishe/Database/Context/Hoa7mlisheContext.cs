@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using hoa7mlishe.API.Database.Models;
 using Microsoft.EntityFrameworkCore;
+using hoa7mlishe.API.Database.Models;
 
 namespace hoa7mlishe.API.Database.Context;
 
@@ -14,28 +14,35 @@ public partial class Hoa7mlisheContext : DbContext
     public Hoa7mlisheContext(DbContextOptions<Hoa7mlisheContext> options)
         : base(options)
     {
-        Database.EnsureCreated();
     }
 
     public virtual DbSet<CardPack> CardPacks { get; set; }
-    public virtual DbSet<CardSeason> CardSeasons { get; set; }
-    public virtual DbSet<CollectedCard> CollectedCards { get; set; }
-    public virtual DbSet<DeathClock> DeathClocks { get; set; }
-    public virtual DbSet<Models.CardInfo> FileInfos { get; set; }
-    public virtual DbSet<FileInterface> FileInterfaces { get; set; }
-    public virtual DbSet<Hoa7mlisheFile> Hoa7mlisheFiles { get; set; }
-    public virtual DbSet<IvonovQuote> IvonovQuotes { get; set; }
-    public virtual DbSet<TradeContent> TradeContents { get; set; }
-    public virtual DbSet<TradeOffer> TradeOffers { get; set; }
-    public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<CardSeason> CardSeasons { get; set; }
+
+    public virtual DbSet<CollectedCard> CollectedCards { get; set; }
+
+    public virtual DbSet<DeathClock> DeathClocks { get; set; }
+
+    public virtual DbSet<CardInfo> FileInfos { get; set; }
+
+    public virtual DbSet<FileInterface> FileInterfaces { get; set; }
+
+    public virtual DbSet<Hoa7mlisheFile> Hoa7mlisheFiles { get; set; }
+
+    public virtual DbSet<IvonovQuote> IvonovQuotes { get; set; }
+
+    public virtual DbSet<TradeContent> TradeContents { get; set; }
+
+    public virtual DbSet<TradeOffer> TradeOffers { get; set; }
+
+    public virtual DbSet<User> Users { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #if DEBUG
                 => optionsBuilder.UseSqlServer("Server=.\\HOASERVER_DEV;Database=Hoa7mlishe;User Id=sa;Password=chuchikmuchik;TrustServerCertificate=true", x => x.UseHierarchyId());
 #else
         => optionsBuilder.UseSqlServer("Server=localhost\\HOASERVER_PROD; Database = Hoa7mlishe; TrustServerCertificate=True; Trusted_Connection = True; User Id=sa; Password=123asd123;", x => x.UseHierarchyId());
 #endif
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("SQL_Latin1_General_CP1_CI_AS");
@@ -52,6 +59,10 @@ public partial class Hoa7mlisheContext : DbContext
             entity.HasOne(d => d.Card).WithMany(p => p.CollectedCards)
                 .HasForeignKey(d => d.CardId)
                 .HasConstraintName("FK_CollectedCards_FileInfos");
+
+            entity.HasOne(d => d.User).WithMany(p => p.CollectedCards)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_CollectedCards_Users");
         });
 
         modelBuilder.Entity<DeathClock>(entity =>

@@ -16,4 +16,6 @@ public partial class CollectedCard
     public bool IsShiny { get; set; }
 
     public virtual CardInfo Card { get; set; } = null!;
+
+    public virtual User User { get; set; } = null!;
 }

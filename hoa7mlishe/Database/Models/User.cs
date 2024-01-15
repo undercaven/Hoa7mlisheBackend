@@ -1,5 +1,4 @@
-﻿using hoa7mlishe.API.DTO.Users;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace hoa7mlishe.API.Database.Models;
@@ -22,17 +21,9 @@ public partial class User
 
     public Guid? AvatarId { get; set; }
 
+    public virtual ICollection<CollectedCard> CollectedCards { get; set; } = new List<CollectedCard>();
+
     public virtual ICollection<TradeOffer> TradeOfferReceivers { get; set; } = new List<TradeOffer>();
 
     public virtual ICollection<TradeOffer> TradeOfferSenders { get; set; } = new List<TradeOffer>();
-
-    internal UserShortDTO GetShortDto() => new()
-    {
-        Username = this.Username,
-        Role = this.Role,
-        Mikoins = this.Mikoins,
-        Id = this.Id,
-        AvatarId = this.AvatarId
-    };
-
 }

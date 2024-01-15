@@ -4,20 +4,31 @@ using hoa7mlishe.API.Services.Interfaces;
 using hoa7mlishe.API.Trading.Models;
 using hoa7mlishe.API.Trading.Services;
 using hoa7mlishe.Trading.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace hoa7mlishe.API.Controllers
 {
+    /// <summary>
+    /// Контроллер для операций обмена между пользователями
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [EnableCors("CorsPolicy")]
+    [Authorize]
     public class TradesController : ControllerBase
     {
         private Hoa7mlisheContext _context;
         private IUserRequestService _userRequestService;
         private ITradesService _tradesService;
 
+        /// <summary>
+        /// Конструктор класса
+        /// </summary>
+        /// <param name="context">Контекст БД</param>
+        /// <param name="userRequestService">Сервис для работы с пользователями</param>
+        /// <param name="tradesService">Сервис для работы с обменом</param>
         public TradesController(Hoa7mlisheContext context, IUserRequestService userRequestService, ITradesService tradesService)
         {
             _context = context;
@@ -25,14 +36,18 @@ namespace hoa7mlishe.API.Controllers
             _tradesService = tradesService;
         }
 
-            [HttpPost("offers")]
+        /// <summary>
+        /// Создает предложение обмена
+        /// </summary>
+        /// <param name="offer">Предложение обмена</param>
+        /// <returns></returns>
+        [HttpPost("offers")]
         public IActionResult PostTradeOffer(
-            [FromBody] TradeOfferDto offer,
-            [FromHeader] string accessToken)
+            [FromBody] TradeOfferDto offer)
         {
-            var sender = _userRequestService.GetUser(accessToken);
+            var sender = _userRequestService.GetUser(User.Identity);
 
-            if (sender is null || sender?.Id != offer.SenderId)
+            if (sender?.Id != offer.SenderId)
             {
                 return Unauthorized();
             }
@@ -49,12 +64,16 @@ namespace hoa7mlishe.API.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Принимает предложение обмена
+        /// </summary>
+        /// <param name="offerId">Идентификатор предложения</param>
+        /// <returns></returns>
         [HttpPut("offers/{offerId}/confirm")]
         public IActionResult AcceptTradeOffer(
-            Guid offerId,
-            [FromHeader] string accessToken)
+            Guid offerId)
         {
-            User user = _userRequestService.GetUser(accessToken);
+            User user = _userRequestService.GetUser(User.Identity);
             if (user is null)
             {
                 return Unauthorized();
@@ -65,12 +84,16 @@ namespace hoa7mlishe.API.Controllers
             return result ? Ok() : BadRequest();
         }
 
+        /// <summary>
+        /// Получает предложения обмена для пользователя
+        /// </summary>
+        /// <param name="status">Статус предложений, которые требуется отобрать</param>
+        /// <returns></returns>
         [HttpGet("offers/{status}")]
         public IActionResult GetTradeOffers(
-            string status,
-            [FromHeader] string accessToken)
+            string status)
         {
-            var user = _userRequestService.GetUser(accessToken);
+            var user = _userRequestService.GetUser(User.Identity);
 
             if (user is null)
             {
@@ -82,12 +105,16 @@ namespace hoa7mlishe.API.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Дарит карточку другому пользователю
+        /// </summary>
+        /// <param name="giftInfo">Описание подарка</param>
+        /// <returns></returns>
         [HttpPut("sendGift")]
         public IActionResult GiftCard(
-            [FromHeader] string accessToken,
             [FromBody] GiftDto giftInfo)
         {
-            var sender = _userRequestService.GetUser(accessToken);
+            var sender = _userRequestService.GetUser(User.Identity);
             if (sender is null)
             {
                 return Unauthorized();

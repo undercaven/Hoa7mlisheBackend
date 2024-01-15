@@ -35,7 +35,7 @@ public partial class CardInfo
     public virtual ICollection<TradeContent> TradeContents { get; set; } = new List<TradeContent>();
 
     [NotMapped]
-    public bool IsShiny { get; internal set; }
+    internal bool IsShiny { get; set; }
 
-    internal CardInfo Clone() => base.MemberwiseClone() as CardInfo;
+    internal CardInfo? Clone() => MemberwiseClone() as CardInfo;
 }
