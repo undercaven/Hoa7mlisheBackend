@@ -37,5 +37,5 @@ public partial class CardInfo
     [NotMapped]
     public bool IsShiny { get; internal set; }
 
-    internal CardInfo Clone() => base.MemberwiseClone() as CardInfo;
+    internal CardInfo? Clone() => MemberwiseClone() as CardInfo;
 }

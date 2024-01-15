@@ -33,9 +33,6 @@ namespace hoa7mlishe.Interfaces.Server
             _services.AddService(serviceType, serviceInstance);
         }
 
-        public static object GetService(Type serviceType)
-        {
-            return _services.GetService(serviceType);
-        }
+        public static object GetService(Type serviceType) => _services.GetService(serviceType);
     }
 }

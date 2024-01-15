@@ -7,20 +7,24 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace hoa7mlishe.API.Controllers
 {
+    /// <summary>
+    /// Контроллер для операций с файлами
+    /// </summary>
+    /// <param name="context">Контекст БД</param>
+    /// <param name="fileService">Файловый сервис</param>
     [Route("api/[controller]")]
     [ApiController]
     [EnableCors("CorsPolicy")]
-    public class FilesController : ControllerBase
+    public class FilesController(Hoa7mlisheContext context, IFileService fileService) : ControllerBase
     {
-        private readonly Hoa7mlisheContext _context;
-        private readonly IFileService _fileService;
+        private readonly Hoa7mlisheContext _context = context;
+        private readonly IFileService _fileService = fileService;
 
-        public FilesController(Hoa7mlisheContext context, IFileService fileService)
-        {
-            _context = context;
-            _fileService = fileService;
-        }
-
+        /// <summary>
+        /// Проверяет существование файла
+        /// </summary>
+        /// <param name="fileId">Идентификатор файла</param>
+        /// <returns></returns>
         [HttpGet("exists")]
         public IActionResult CheckFileExists(
         [FromQuery] Guid fileId)
@@ -37,8 +41,6 @@ namespace hoa7mlishe.API.Controllers
 
             return (Ok(result));
         }
-
-        
 
         /// <summary>
         /// Получает файл

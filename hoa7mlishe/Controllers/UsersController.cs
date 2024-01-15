@@ -1,4 +1,6 @@
-﻿using hoa7mlishe.API.Database.Context;
+﻿using hoa7mlishe.API.Authorization.DTO;
+using hoa7mlishe.API.Authorization.Helpers;
+using hoa7mlishe.API.Database.Context;
 using hoa7mlishe.API.Database.Models;
 using hoa7mlishe.API.DTO.Files;
 using hoa7mlishe.API.DTO.Users;
@@ -7,47 +9,45 @@ using hoa7mlishe.API.Services;
 using hoa7mlishe.API.Services.Interfaces;
 using hoa7mlishe.Helpers;
 using hoa7mlishe.Hoa7Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace hoa7mlishe.API.Controllers
 {
+    /// <summary>
+    /// Контроллер для операций работы с пользователями
+    /// </summary>
+    /// <param name="context">Контекст БД</param>
+    /// <param name="userRequestService">Сервис для работы с пользователями</param>
+    /// <param name="mailService">Почтовый сервис</param>
     [Route("api/[controller]")]
     [ApiController]
     [EnableCors("CorsPolicy")]
-    public class UsersController : ControllerBase
+    [Authorize]
+    public class UsersController(Hoa7mlisheContext context, IUserRequestService userRequestService, IMailService mailService) : ControllerBase
     {
-        private Hoa7mlisheContext _context;
-        private IUserRequestService _userRequestService;
-        private IMailService _mailService;
-
-        public UsersController(Hoa7mlisheContext context, IUserRequestService userRequestService, IMailService mailService)
-        {
-            _context = context;
-            _userRequestService = userRequestService;
-            _mailService = mailService;
-        }
+        private Hoa7mlisheContext _context = context;
+        private IUserRequestService _userRequestService = userRequestService;
+        private IMailService _mailService = mailService;
 
         /// <summary>
-        /// Обновляет accessToken пользователя
+        /// Обновляет устаревший токен
         /// </summary>
-        /// <param name="refreshToken"></param>
-        /// <returns></returns>
+        /// <param name="tokenInfo">Токены пользователя</param>
+        /// <returns>Новая пара токенов</returns>
+        [AllowAnonymous]
         [HttpGet("refreshToken")]
-        public IActionResult RefreshToken(string refreshToken)
+        public IActionResult RefreshToken(TokenApiDTO tokenInfo)
         {
-            string accessToken = _userRequestService.UpdateRefreshToken(ref refreshToken);
+            var newTokens = _userRequestService.UpdateRefreshToken(tokenInfo);
 
-            if (accessToken is null)
+            if (newTokens is null)
             {
                 return Unauthorized();
             }
 
-            return Ok(new
-            {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
-            });
+            return Ok(newTokens);
         }
 
         /// <summary>
@@ -56,6 +56,7 @@ namespace hoa7mlishe.API.Controllers
         /// <param name="user"> данные пользователя </param>
         /// <returns>accessToken</returns>
         [HttpPost("login")]
+        [AllowAnonymous]
         public IActionResult LoginUser(
             [FromBody] UserLoginDTO user)
         {
@@ -70,6 +71,7 @@ namespace hoa7mlishe.API.Controllers
         /// <param name="user"> данные пользователя</param>
         /// <returns>accessToken</returns>
         [HttpPost("register")]
+        [AllowAnonymous]
         public IActionResult RegisterUser(
             [FromForm] UserRegisterDTO user)
         {
@@ -78,12 +80,16 @@ namespace hoa7mlishe.API.Controllers
             return response is null ? Conflict() : Ok(response);
         }
 
+        /// <summary>
+        /// Меняет фото профиля пользователя
+        /// </summary>
+        /// <param name="avatar">Новое фото</param>
+        /// <returns></returns>
         [HttpPost("uploadAvatar")]
         public IActionResult UploadUserAvatar(
-            [FromForm] FileDTO avatar,
-            [FromHeader] string accessToken)
+            [FromForm] FileDTO avatar)
         {
-            var user = _userRequestService.GetUser(accessToken);
+            var user = _userRequestService.GetUser(User.Identity);
 
             if (user is null)
             {
@@ -94,11 +100,12 @@ namespace hoa7mlishe.API.Controllers
         }
 
         /// <summary>
-        /// Возвращает имя и роль пользователя
+        /// Возвращает краткую информацию о требуемом пользователе
         /// </summary>
-        /// <param name="accessToken"></param>
-        /// <returns>Инфо о пользователе</returns>
+        /// <param name="userId">Идентификатор пользователя</param>
+        /// <returns></returns>
         [HttpGet("{userId}")]
+        [AllowAnonymous]
         public IActionResult GetUserInfo(
             Guid userId)
         {
@@ -107,7 +114,13 @@ namespace hoa7mlishe.API.Controllers
             return requestedUser is null ? NotFound() : Ok(new { requestedUser.Username, requestedUser.Role, requestedUser.Mikoins, requestedUser.AvatarId });
         }
 
+        /// <summary>
+        /// Получает количество зарегистрированных пользователей
+        /// </summary>
+        /// <param name="username">Если параметр указан, будет произведен поиск пользователей, чьи имена содержат данную подстроку</param>
+        /// <returns></returns>
         [HttpGet("search")]
+        [AllowAnonymous]
         public IActionResult GetUserList(
             string? username
             )
@@ -120,17 +133,15 @@ namespace hoa7mlishe.API.Controllers
             return Ok(_context.Users.Where(x => x.Username.Contains(username)).Count());
         }
 
-        [HttpGet("decypherToken")]
-        public IActionResult DecypherToken(
-            string token)
-        {
-            DateTime when = DateTime.Now;
-            Guid g = AuthorizationHelper.DecypherToken(token, ref when);
-            string whenstr = when.ToLongDateString();
-            return Ok(new { g, whenstr });
-        }
-
+        /// <summary>
+        /// Получает страницу с пользователями
+        /// </summary>
+        /// <param name="username">Если параметр указан, будет произведен поиск пользователей, чьи имена содержат данную подстроку</param>
+        /// <param name="page">Номер страницы</param>
+        /// <param name="pageSize">Размер страницы</param>
+        /// <returns></returns>
         [HttpGet("search/{page}")]
+        [AllowAnonymous]
         public IActionResult GetUsersPage(
             string? username,
             int page,
@@ -142,35 +153,32 @@ namespace hoa7mlishe.API.Controllers
         /// <summary>
         /// Возвращает имя и роль текущего пользователя пользователя
         /// </summary>
-        /// <param name="accessToken"></param>
         /// <returns>Инфо о пользователе</returns>
         [HttpGet]
-        public IActionResult GetMe(
-            [FromHeader] string accessToken)
+        public IActionResult GetMe()
         {
-            User user = _userRequestService.GetUser(accessToken);
+            User user = _userRequestService.GetUser(User.Identity);
 
-            if (user is not null)
+            if (user is null)
             {
-                var ip = String.Format("Sender IP: {0}, {1}\n", user.Username, Request.HttpContext.Connection.RemoteIpAddress);
-                Console.WriteLine(ip);
+                return Unauthorized();
             }
 
-            return user is null ? Unauthorized() : Ok(new { user.Username, user.Role, user.Mikoins, user.Id, user.AvatarId });
+            var ip = string.Format("Sender IP: {0}, {1}\n", user.Username, Request.HttpContext.Connection.RemoteIpAddress);
+            Console.WriteLine(ip);
+            return Ok(new { user.Username, user.Role, user.Mikoins, user.Id, user.AvatarId });
         }
 
         /// <summary>
         /// Обновляет микоины пользователя
         /// </summary>
         /// <param name="mikoins">новое количество микоинов</param>
-        /// <param name="accessToken"></param>
         /// <returns></returns>
         [HttpPost("mikoins")]
         public IActionResult UpdateUserMikoins(
-            long mikoins,
-            [FromHeader] string accessToken)
+            long mikoins)
         {
-            User user = _userRequestService.GetUser(accessToken);
+            User user = _userRequestService.GetUser(User.Identity);
 
             if (user is null)
             {
@@ -192,9 +200,9 @@ namespace hoa7mlishe.API.Controllers
         /// <summary>
         /// Получает микоины пользователя
         /// </summary>
-        /// <param name="accessToken"></param>
         /// <returns></returns>
         [HttpGet("mikoins")]
+        [AllowAnonymous]
         public IActionResult GetUserMikoins(
             Guid userId)
         {
@@ -208,17 +216,15 @@ namespace hoa7mlishe.API.Controllers
         /// </summary>
         /// <param name="id">id пользователя</param>
         /// <param name="userRegister">новые данные</param>
-        /// <param name="accessToken">токен</param>
         /// <returns></returns>
         [HttpPost("update/{id}")]
         public IActionResult UpdateData(
             Guid id,
-            [FromQuery] UserRegisterDTO userRegister,
-            [FromHeader] string accessToken)
+            [FromQuery] UserRegisterDTO userRegister)
         {
             try
             {
-                User user = _userRequestService.GetUser(accessToken);
+                User user = _userRequestService.GetUser(User.Identity);
 
                 if (user?.Role != "admin")
                 {
@@ -240,20 +246,7 @@ namespace hoa7mlishe.API.Controllers
         }
 
         #region test
-        [HttpPost("sendMailMessage")]
-        public async Task<IActionResult> SendTestMessage(
-            [FromForm] string caption,
-            [FromForm] string message,
-            [FromForm] string[] sendTo,
-            [FromForm] IFormFile[] attachments)
-        {
-            var pars = new MailParameters(caption, message);
-            pars.AddAttachments(attachments);
-            pars.AddRecipients(sendTo);
-            await _mailService.SendMessage(pars);
-
-            return Ok();
-        }
+        
         #endregion
     }
 }

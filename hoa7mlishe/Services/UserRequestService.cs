@@ -1,9 +1,14 @@
-﻿using hoa7mlishe.API.Database.Context;
+﻿using hoa7mlishe.API.Authorization.DTO;
+using hoa7mlishe.API.Authorization.Helpers;
+using hoa7mlishe.API.Database;
+using hoa7mlishe.API.Database.Context;
 using hoa7mlishe.API.Database.Models;
 using hoa7mlishe.API.DTO.Users;
 using hoa7mlishe.API.Services.Interfaces;
 using hoa7mlishe.Helpers;
 using hoa7mlishe.Hoa7Enums;
+using System.Security.Claims;
+using System.Security.Principal;
 
 namespace hoa7mlishe.API.Services
 {
@@ -11,76 +16,61 @@ namespace hoa7mlishe.API.Services
     {
         private Hoa7mlisheContext _context;
         private IFileService _fileService;
+        private ILogger<UserRequestService> _logger;
 
-        public UserRequestService(Hoa7mlisheContext context, IFileService fileService)
+        public UserRequestService(Hoa7mlisheContext context, IFileService fileService, ILogger<UserRequestService> logger)
         {
             _context = context;
             _fileService = fileService;
+            _logger = logger;
         }
+
         public List<UserShortDTO> GetUsersPage(string username, int page, int pageSize)
         {
-            List<User> users;
-
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                users = _context.Users.ToList();
-            }
-            else
-            {
-                users = _context.Users.Where(x => x.Username.Contains(username)).ToList();
-            }
+            List<User> users = string.IsNullOrWhiteSpace(username)
+                ? [.. _context.Users]
+                : [.. _context.Users.Where(x => x.Username.Contains(username))];
 
             int arrayStart = (page - 1) * pageSize;
-            int offset;
+            int offset = arrayStart + pageSize < users.Count ? pageSize : users.Count - arrayStart;
 
-            if (arrayStart + pageSize < users.Count)
-            {
-                offset = pageSize;
-            }
-            else
-            {
-                offset = users.Count - arrayStart;
-            }
-
-            var result = new List<UserShortDTO>();
-            foreach (var user in users.GetRange(arrayStart, offset))
-            {
-                result.Add(user.GetShortDto());
-            }
-
-            return result;
+            return users.GetRange(arrayStart, offset)
+                .Select(user => user.GetShortDto())
+                .ToList();
         }
 
         public User GetUser(Guid userId)
         {
-            return _context.Users.Where(x => x.Id == userId).FirstOrDefault();
+            return _context.Users.First(x => x.Id == userId);
         }
 
-        public User GetUser(string accessToken, int hoursOffset = 3)
+        public User GetUser(IIdentity identity)
         {
-            Guid userId = AuthorizationHelper.DecypherToken(accessToken, hoursOffset);
-
-            return _context.Users.Where(x => x.Id == userId).FirstOrDefault();
+            var claims = identity as ClaimsIdentity;
+            var userId = Guid.Parse(claims.FindFirst("NameIdentifier")?.Value);
+            return _context.Users.FirstOrDefault(x => x.Id == userId);
         }
 
-        public string UpdateRefreshToken(ref string refreshToken)
+        public TokenApiDTO UpdateRefreshToken(TokenApiDTO tokenInfo)
         {
-            User user = GetUser(refreshToken, 140);
+            var tokenPrincipals = AuthorizationHelper.GetPrincipalFromExpiredToken(tokenInfo.AccessToken);
+            var userID = Guid.Parse(tokenPrincipals.FindFirst("NameIdentifier")?.Value);
 
-            if (user is null)
+            User user = GetUser(userID);
+
+            if (user?.RefreshToken != tokenInfo.RefreshToken)
             {
                 return null;
             }
 
-            refreshToken = AuthorizationHelper.GenerateToken(Guid.NewGuid(), 140);
-            user.RefreshToken = refreshToken;
+            var newTokens = AuthorizationHelper.GenerateTokens(user);
+            user.RefreshToken = newTokens.RefreshToken;
 
             _context.Update(user);
             _context.SaveChanges();
 
-            return AuthorizationHelper.GenerateToken(user.Id, 3);
+            return newTokens;
         }
-
 
         public UserResponseDTO LoginUser(UserLoginDTO user)
         {
@@ -95,16 +85,15 @@ namespace hoa7mlishe.API.Services
                 return null;
             }
 
-            userInfo.RefreshToken = AuthorizationHelper.GenerateToken(userInfo.Id, 140);
+            userInfo.RefreshToken = AuthorizationHelper.GenerateRefreshToken();
             _context.SaveChanges();
 
             UserResponseDTO response = new()
             {
                 Id = userInfo.Id,
-                AccessToken = AuthorizationHelper.GenerateToken(userInfo.Id, 3),
+                Tokens = AuthorizationHelper.GenerateTokens(userInfo),
                 Role = userInfo.Role,
                 Username = userInfo.Username,
-                RefreshToken = userInfo.RefreshToken,
                 Mikoins = userInfo.Mikoins,
                 AvatarId = userInfo.AvatarId,
             };
@@ -131,7 +120,8 @@ namespace hoa7mlishe.API.Services
                 Mikoins = 0
             };
 
-            userInfo.RefreshToken = AuthorizationHelper.GenerateToken(userInfo.Id, 140);
+            var tokens = AuthorizationHelper.GenerateTokens(userInfo);
+            userInfo.RefreshToken = tokens.RefreshToken;
 
             _context.Users.Add(userInfo);
             _context.SaveChanges();
@@ -139,10 +129,9 @@ namespace hoa7mlishe.API.Services
             return new UserResponseDTO()
             {
                 Id = userInfo.Id,
-                AccessToken = AuthorizationHelper.GenerateToken(userInfo.Id, 3),
+                Tokens = tokens,
                 Role = userInfo.Role,
                 Username = userInfo.Username,
-                RefreshToken = userInfo.RefreshToken,
             };
         }
 

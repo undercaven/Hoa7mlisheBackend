@@ -21,31 +21,30 @@ namespace hoa7mlishe.Services
 
         private static IMapper PackDtoMapper => new MapperConfiguration(cfg => cfg.CreateMap<CardPack, CardPackDTO>()).CreateMapper();
 
+        /// <summary>
+        /// Получает все паки карточек, видимые пользователю
+        /// </summary>
+        /// <param name="userRole">Роль пользователя</param>
+        /// <returns>Коллекция моделей паков</returns>
         public List<CardPackDTO> GetPacks(string userRole = "user")
         {
-            List<CardPack> cardPacks = new();
-            if (userRole != "admin")
-            {
-                cardPacks = _context.CardPacks.Where(x => !x.Hidden).ToList();
-            }
-            else
-            {
-                cardPacks = _context.CardPacks.ToList();
-            }
-            
+            List<CardPack> cardPacks = [];
+
+            cardPacks = userRole != "admin" ? [.. _context.CardPacks.Where(x => !x.Hidden)] : [.. _context.CardPacks];
+
             var result = new List<CardPackDTO>();
 
             foreach (var pack in cardPacks)
             {
                 CardPackDTO packDto = PackDtoMapper.Map<CardPackDTO>(pack);
-                packDto.CardDistrib = new List<int>();
+                packDto.CardDistrib = [];
                 for (int i = 1; i <= 6; ++i)
                 {
                     packDto.CardDistrib.Add(_context.FileInfos.Count(x => x.Tag == pack.Tag && x.Rarity == i));
                 }
 
                 string[] raritiesStr = pack.CardDistribution.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                raritiesStr = raritiesStr.Append("1000").ToArray();
+                raritiesStr = [.. raritiesStr, "1000"];
 
                 packDto.Rarities = new double[raritiesStr.Length];
 
@@ -60,9 +59,16 @@ namespace hoa7mlishe.Services
                 result.Add(packDto);
             }
 
-            return result.OrderBy(x => x.Price).ThenBy(x => x.Description).ToList();
+            return [.. result.OrderBy(x => x.Price).ThenBy(x => x.Description)];
         }
 
+        /// <summary>
+        /// "Открывает" пак карточек, генерируя случайный набор карточек
+        /// </summary>
+        /// <param name="seasonId">Идентификатор сезона</param>
+        /// <param name="packSize">Размер пака</param>
+        /// <param name="userId">Идентификатор пользователя</param>
+        /// <returns>Коллекция карточек</returns>
         public List<CardInfo> GenerateCardPack(int seasonId, int packSize, Guid userId)
         {
             var result = new List<CardInfo>();
@@ -80,7 +86,8 @@ namespace hoa7mlishe.Services
             for (int i = 0; i < packSize; i++)
             {
                 int rarity = GetRarity();
-                var suitableFiles = seasonCards.Where(x => x.Rarity == rarity).ToList();
+                List<CardInfo> suitableFiles = [.. seasonCards.Where(x => x.Rarity == rarity)];
+
                 int r = RandomNumberGenerator.GetInt32(suitableFiles.Count);
 
                 CardInfo card = suitableFiles[r];
@@ -97,14 +104,13 @@ namespace hoa7mlishe.Services
         public Dictionary<string, int> GetCardDistribution(int season)
         {
             var result = new Dictionary<string, int>();
-            string[] names = new string[]
-            {
+            string[] names = [
                 "Gray",
                 "Green",
                 "Blue",
                 "Purple",
                 "Golden"
-            };
+            ];
 
             for (int i = 1; i <= 5; i++)
             {
@@ -116,16 +122,22 @@ namespace hoa7mlishe.Services
             return result;
         }
 
+        /// <summary>
+        /// "Открывает" пак карточек, генерируя случайный набор карточек
+        /// </summary>
+        /// <param name="packId">Идентификатор пака</param>
+        /// <param name="user">Пользователь</param>
+        /// <param name="packSize">Размер пака</param>
+        /// <returns></returns>
         public List<CardInfo> GenerateCardPack(Guid packId, User user, int packSize = 0)
         {
-            CardPack pack = _context.CardPacks.Where(x => x.Id == packId).FirstOrDefault();
+            CardPack pack = _context.CardPacks.FirstOrDefault(x => x.Id == packId);
 
             if (pack is null) return null;
 
             _userRequestService.UpdateMikoins(user, pack.Price, MikoinUpdateOptions.Subtractive);
 
             var result = new List<CardInfo>();
-
 
             IQueryable<CardInfo> seasonCards = true switch
             {
@@ -139,7 +151,7 @@ namespace hoa7mlishe.Services
             for (int i = 0; i < cardCount; i++)
              {
                 int rarity = GetRarity(pack.CardDistribution);
-                var suitableFiles = seasonCards.Where(x => x.Rarity == rarity).ToList();
+                List<CardInfo> suitableFiles = [.. seasonCards.Where(x => x.Rarity == rarity)];
                 int r = RandomNumberGenerator.GetInt32(suitableFiles.Count);
 
                 CardInfo card = suitableFiles[r].Clone();
@@ -153,9 +165,14 @@ namespace hoa7mlishe.Services
             return result;
         }
 
-
+        /// <summary>
+        /// Получает количество карточек, собранных пользователем
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns></returns>
         public int GetCardCount(Guid userId)
         {
+            var user = _context.Users.First(x => x.Id == userId);
             return _context.CollectedCards.Count(x => x.UserId == userId);
         }
 
@@ -210,7 +227,7 @@ namespace hoa7mlishe.Services
                 var cardDto = new CollectedCardsDTO()
                 {
                     Count = card.Count,
-                    CardInfo = _context.FileInfos.Where(x => x.Id == card.CardId).First().Clone(),
+                    CardInfo = card.Card.Clone(),
                     IsShiny = isShiny
                 };
 

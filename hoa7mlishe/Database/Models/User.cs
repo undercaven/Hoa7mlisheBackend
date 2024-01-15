@@ -26,13 +26,6 @@ public partial class User
 
     public virtual ICollection<TradeOffer> TradeOfferSenders { get; set; } = new List<TradeOffer>();
 
-    internal UserShortDTO GetShortDto() => new()
-    {
-        Username = this.Username,
-        Role = this.Role,
-        Mikoins = this.Mikoins,
-        Id = this.Id,
-        AvatarId = this.AvatarId
-    };
+    
 
 }

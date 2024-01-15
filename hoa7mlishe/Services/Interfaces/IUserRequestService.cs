@@ -1,6 +1,9 @@
-﻿using hoa7mlishe.API.Database.Models;
+﻿using hoa7mlishe.API.Authorization.DTO;
+using hoa7mlishe.API.Database.Models;
 using hoa7mlishe.API.DTO.Users;
 using hoa7mlishe.Hoa7Enums;
+using System.Security.Claims;
+using System.Security.Principal;
 
 namespace hoa7mlishe.API.Services.Interfaces
 {
@@ -10,9 +13,9 @@ namespace hoa7mlishe.API.Services.Interfaces
 
         public User GetUser(Guid userId);
 
-        public User GetUser(string accessToken, int hoursOffset = 3);
+        public User GetUser(IIdentity claims);
 
-        public string UpdateRefreshToken(ref string refreshToken);
+        public TokenApiDTO UpdateRefreshToken(TokenApiDTO tokenInfo);
 
         public UserResponseDTO LoginUser(UserLoginDTO user);
 

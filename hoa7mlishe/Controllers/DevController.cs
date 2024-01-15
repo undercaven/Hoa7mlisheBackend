@@ -2,40 +2,41 @@
 using hoa7mlishe.API.Database.Models;
 using hoa7mlishe.API.DTO.Cards;
 using hoa7mlishe.API.DTO.Files;
+using hoa7mlishe.API.Mail;
 using hoa7mlishe.API.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace hoa7mlishe.API.Controllers
 {
+    /// <summary>
+    /// Контроллер с методами администратора
+    /// </summary>
+    /// <param name="context">Контекст БД</param>
+    /// <param name="filesvc">Файловый сервис</param>
+    /// <param name="userRequestService">Сервис для работы с пользователями</param>
+    /// <param name="mailService">Почтовый сервис</param>
     [Route("api/[controller]")]
     [ApiController]
     [EnableCors("CorsPolicy")]
-    public class DevController : ControllerBase
+    [Authorize(Roles = "admin")]
+    public class DevController(Hoa7mlisheContext context, IFileService filesvc, IUserRequestService userRequestService, IMailService mailService) : ControllerBase
     {
-        private Hoa7mlisheContext _context;
-        private IFileService _fileService;
-        private IUserRequestService _userRequestService;
+        private Hoa7mlisheContext _context = context;
+        private IFileService _fileService = filesvc;
+        private IUserRequestService _userRequestService = userRequestService;
+        private IMailService _mailService = mailService;
 
-        public DevController(Hoa7mlisheContext context, IFileService filesvc, IUserRequestService userRequestService)
-        {
-            _context = context;
-            _fileService = filesvc;
-            _userRequestService = userRequestService;
-        }
-
+        /// <summary>
+        /// Изменяет видимость пака карточек
+        /// </summary>
+        /// <param name="packId">Идентификатор пака</param>
+        /// <returns></returns>
         [HttpPut("packs/{packId}/changeVisibility")]
         public IActionResult ChangePackVisibility(
-            Guid packId,
-            [FromHeader] string accessToken)
+            Guid packId)
         {
-            var user = _userRequestService.GetUser(accessToken);
-
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             var pack = _context.CardPacks.Single(x => x.Id == packId);
             pack.Hidden = !pack.Hidden;
 
@@ -45,19 +46,17 @@ namespace hoa7mlishe.API.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Изменяет фото карточки
+        /// </summary>
+        /// <param name="file">Новое фото</param>
+        /// <param name="id">Идентификатор карточки</param>
+        /// <returns></returns>
         [HttpPost("changeCardImage/{id}")]
         public IActionResult ChangeCardImage(
             [FromForm] FileDTO file,
-            Guid id,
-            [FromHeader] string accessToken)
+            Guid id)
         {
-            var user = _userRequestService.GetUser(accessToken);
-
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             var card = _context.FileInfos.Single(x => x.Id == id);
             var fi = _context.FileInterfaces.Single(x => x.RecordId == card.FileId);
             var fr = _context.Hoa7mlisheFiles.Single(x => x.PathLocator == fi.PathLocator);
@@ -67,18 +66,15 @@ namespace hoa7mlishe.API.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Связывает файловый интерфейс с записью о карточке
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns></returns>
         [HttpPost("linkFiles")]
         public IActionResult LinkFileInterface(
-            [FromForm] string filename,
-            [FromHeader] string accessToken)
+            [FromForm] string filename)
         {
-            var user = _userRequestService.GetUser(accessToken);
-
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             Hoa7mlisheFile filerecord = _context.Hoa7mlisheFiles.Single(x => x.Name == filename);
             FileInterface fi = new()
             {
@@ -101,18 +97,10 @@ namespace hoa7mlishe.API.Controllers
         /// <response code="400">Неверный формат файла</response>
         [HttpPost("lore")]
         public IActionResult PostFile(
-            [FromForm] CardDTO file,
-            [FromHeader] string accessToken)
+            [FromForm] CardDTO file)
         {
             try
             {
-                var user = _userRequestService.GetUser(accessToken);
-
-                if (user?.Role != "admin")
-                {
-                    return Unauthorized();
-                }
-
                 Guid fileId = _fileService.PostCard(file);
                 return Ok(fileId);
             }
@@ -122,17 +110,15 @@ namespace hoa7mlishe.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Удаляет пак карточек из базы
+        /// </summary>
+        /// <param name="packId">Идентификатор пака</param>
+        /// <returns></returns>
         [HttpDelete("packs/{packId}")]
         public IActionResult DeletePack(
-            Guid packId,
-            [FromHeader] string accessToken)
+            Guid packId)
         {
-            var user = _userRequestService.GetUser(accessToken);
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             var packToRemove = _context.CardPacks.SingleOrDefault(x => x.Id == packId);
 
             if (packToRemove is not null)
@@ -144,17 +130,15 @@ namespace hoa7mlishe.API.Controllers
             return Ok();
         }
         
+        /// <summary>
+        /// Удаляет карточки из базы
+        /// </summary>
+        /// <param name="cardIds">Идентификаторы карточек</param>
+        /// <returns></returns>
         [HttpDelete("cards")]
         public IActionResult DeleteCards(
-            List<Guid> cardIds,
-            [FromHeader] string accessToken)
+            List<Guid> cardIds)
         {
-            var user = _userRequestService.GetUser(accessToken);
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             foreach (var cardId in cardIds)
             {
                 var cardToRemove = _context.FileInfos.SingleOrDefault(x => x.Id == cardId);
@@ -169,20 +153,17 @@ namespace hoa7mlishe.API.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Создает пак карточек
+        /// </summary>
+        /// <param name="packDto">Модель пака</param>
+        /// <returns></returns>
         [HttpPost("packs")]
         public IActionResult CreatePack(
-            [FromForm] CardPackPostDTO packDto,
-            [FromHeader] string accessToken)
+            [FromForm] CardPackPostDTO packDto)
         {
             try
             {
-                var user = _userRequestService.GetUser(accessToken);
-
-                if (user?.Role != "admin")
-                {
-                    return Unauthorized();
-                }
-
                 _fileService.CreatePack(packDto);
 
                 return Ok();
@@ -196,18 +177,12 @@ namespace hoa7mlishe.API.Controllers
         /// <summary>
         /// Добавляет цитату ивонова в базу
         /// </summary>
-        /// <param name="quote"> текст цитаты</param>
-        /// <returns>Результат создания</returns>
+        /// <param name="quote">Текст цитаты</param>
+        /// <returns></returns>
         [HttpPost("quotes")]
         public IActionResult PostIvonovQuote(
-            [FromBody] string quote,
-            [FromHeader] string accessToken)
+            [FromBody] string quote)
         {
-            var user = _userRequestService.GetUser(accessToken);
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
             var ivonovQuote = new IvonovQuote()
             {
                 Quote = quote,
@@ -223,21 +198,14 @@ namespace hoa7mlishe.API.Controllers
         /// <summary>
         /// Создает новый счетчик
         /// </summary>
-        /// <param name="dClock">счетчик</param>
+        /// <param name="dClock">Счетчик</param>
         /// <returns>Результат создания</returns>
         /// <response code="201">Счетчик успешно создан</response>
         /// <response code="409">Счетчик с таким именем уже существует</response>
         [HttpPost("DeathClock")]
         public IActionResult PostDeathClock(
-            [FromBody] DeathClock dClock,
-            [FromHeader] string accessToken)
+            [FromBody] DeathClock dClock)
         {
-            var user = _userRequestService.GetUser(accessToken);
-            if (user?.Role != "admin")
-            {
-                return Unauthorized();
-            }
-
             var deathClock = _context.DeathClocks.Where(x => x.Name == dClock.Name).FirstOrDefault();
 
             if (deathClock is not null)
@@ -249,6 +217,30 @@ namespace hoa7mlishe.API.Controllers
             _context.SaveChanges();
 
             return CreatedAtAction(nameof(PostDeathClock), dClock);
+        }
+
+        /// <summary>
+        /// ТЕСТОВЫЙ МЕТОД
+        /// Отправляет почтовое сообщение
+        /// </summary>
+        /// <param name="caption">Заголовок сообщения</param>
+        /// <param name="message"></param>
+        /// <param name="sendTo"></param>
+        /// <param name="attachments"></param>
+        /// <returns></returns>
+        [HttpPost("sendMailMessage")]
+        public async Task<IActionResult> SendTestMessage(
+            [FromForm] string caption,
+            [FromForm] string message,
+            [FromForm] string[] sendTo,
+            [FromForm] IFormFile[] attachments)
+        {
+            var pars = new MailParameters(caption, message);
+            pars.AddAttachments(attachments);
+            pars.AddRecipients(sendTo);
+            await _mailService.SendMessage(pars);
+
+            return Ok();
         }
     }
 }

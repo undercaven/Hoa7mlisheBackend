@@ -4,12 +4,16 @@ using hoa7mlishe.Database.Models;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using hoa7mlishe.API.Database.Models;
+using Microsoft.AspNetCore.Authorization;
+using hoa7mlishe.API.Authorization.Helpers;
+using System.Security.Claims;
 
 namespace hoa7mlishe.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     [EnableCors("CorsPolicy")]
+    [Authorize]
     public class CardsController : ControllerBase
     {
         private readonly Hoa7mlisheContext _context;
@@ -28,15 +32,13 @@ namespace hoa7mlishe.API.Controllers
         /// <summary>
         /// Получает информацию о случайном файле
         /// </summary>
-        /// <param name="accessToken"></param>
         /// <param name="packId">ID пака</param>
         /// <returns>ИД и описание файла</returns>
         [HttpGet]
         public IActionResult GetRandomCard(
-            [FromQuery] Guid packId,
-            [FromHeader] string accessToken)
+            [FromQuery] Guid packId)
         {
-            User user = _userRequestService.GetUser(accessToken);
+            User user = _userRequestService.GetUser(User.Identity);
             var card = _cardsService.GenerateCardPack(packId, user, 1).First();
 
             return Ok(card);
@@ -47,11 +49,9 @@ namespace hoa7mlishe.API.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("packs")]
-        public IActionResult GetCardPacks([FromHeader] string accessToken)
+        public IActionResult GetCardPacks()
         {
-            var user = _userRequestService.GetUser(accessToken);
-
-            _logger.LogInformation(user.Username);
+            var user = _userRequestService.GetUser(User.Identity);
 
             return Ok(_cardsService.GetPacks(user.Role));
         }
@@ -61,19 +61,19 @@ namespace hoa7mlishe.API.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("packs/info/{packId}")]
+        [AllowAnonymous]
         public IActionResult GetPackInfo(Guid packId) => Ok(_context.CardPacks.Single(x => x.Id == packId));
 
         /// <summary>
         /// Возвращает случайные карты для пака
         /// </summary>
-        /// <param name="accessToken"></param>
-        /// <returns></returns>
+        /// <param name="packId">Идентификатор пака</param>
+        /// <returns>Массив сгенерированных карточек</returns>
         [HttpGet("packs/{packId}")]
         public IActionResult GetCardPack(
-            Guid packId,
-            [FromHeader] string accessToken)
+            Guid packId)
         {
-            User user = _userRequestService.GetUser(accessToken);
+            User user = _userRequestService.GetUser(User.Identity);
 
             if (user is null)
             {
@@ -97,14 +97,15 @@ namespace hoa7mlishe.API.Controllers
         /// <param name="season">номер сезона</param>
         /// <returns></returns>
         [HttpGet("stats/{season}")]
+        [AllowAnonymous]
         public IActionResult GetCardsDistribution(int season) => Ok(_cardsService.GetCardDistribution(season));
 
         /// <summary>
         /// Возвращает карточки полученные текущим пользователем
         /// </summary>
-        /// <param name="accessToken"></param>
         /// <returns></returns>
         [HttpGet("collected/{userId}/count/")]
+        [AllowAnonymous]
         public IActionResult GetCollectedCards(Guid userId) => Ok(_cardsService.GetCardCount(userId));
 
         /// <summary>
@@ -114,9 +115,9 @@ namespace hoa7mlishe.API.Controllers
         /// <param name="pageSize">количество карт на странице</param>
         /// <param name="season">номер сезона</param>
         /// <param name="sortOrder">0 - редкость ASC, 1 - редкость DESC, 2 - количество ASC, 3 - количество DESC</param>
-        /// <param name="accessToken"></param>
         /// <returns></returns>
         [HttpGet("collected/{userId}/{page}")]
+        [AllowAnonymous]
         public IActionResult GetCardsPage(
             Guid userId,
             int page,
@@ -140,9 +141,15 @@ namespace hoa7mlishe.API.Controllers
         /// Возвращает все карточки в базе
         /// </summary>
         /// <returns>Массив информации о фото</returns>
+        [AllowAnonymous]
         [HttpGet("gallery")]
         public IActionResult GetAllCards() => Ok(_cardsService.GetAllCards());
 
+        /// <summary>
+        /// Получает список всех тегов карточек
+        /// </summary>
+        /// <returns></returns>
+        [AllowAnonymous]
         [HttpGet("tags")]
         public IActionResult GetAllTags() => Ok(_cardsService.GetAllTags());
     }
