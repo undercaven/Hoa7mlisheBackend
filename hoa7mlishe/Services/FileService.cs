@@ -66,9 +66,9 @@ namespace hoa7mlishe.Services
         public Guid PostCard(CardDTO file)
         {
             string extension = Path.GetExtension(file.File.FileName);
-            if (extension != ".jpg" && extension != ".png")
+            if (extension != ".jpg" && extension != ".png" && extension != ".gif")
             {
-                throw new IOException("Only .jpg and .png!!");
+                throw new IOException("Only .jpg and .png (or gif)!!");
             }
 
             return SaveInFileTable(file, extension);

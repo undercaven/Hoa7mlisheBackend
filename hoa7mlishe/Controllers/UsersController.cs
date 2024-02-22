@@ -73,7 +73,7 @@ namespace hoa7mlishe.API.Controllers
         [HttpPost("register")]
         [AllowAnonymous]
         public IActionResult RegisterUser(
-            [FromForm] UserRegisterDTO user)
+            [FromBody] UserRegisterDTO user)
         {
             UserResponseDTO response = _userRequestService.RegisterUser(user);
 

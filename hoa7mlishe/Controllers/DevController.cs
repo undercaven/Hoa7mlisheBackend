@@ -89,6 +89,29 @@ namespace hoa7mlishe.API.Controllers
         }
 
         /// <summary>
+        /// Привязывает дополнительный слой к карточке
+        /// </summary>
+        /// <param name="cardId">id карточки</param>
+        /// <param name="name">имя файла (желательно формата *тег*-ult-layer1.png)</param>
+        /// <param name="file">фотография, которая станет дополнительным слоем</param>
+        /// <returns></returns>
+        [HttpPost("addLayer/{cardId}")]
+        public IActionResult AddLayer(
+            Guid cardId,
+            string name,
+            [FromForm] FileDTO file)
+        {
+            CardInfo card = _context.FileInfos.Single(x => x.Id == cardId);
+            Guid interfaceId = _fileService.SaveInFileTable(file.File, filename: name);
+
+            card.LayerOne = interfaceId;
+            _context.Update(card);
+            _context.SaveChanges();
+
+            return Ok();
+        }
+
+        /// <summary>
         /// Добавляет файл в базу
         /// </summary>
         /// <param name="file">Файл</param>

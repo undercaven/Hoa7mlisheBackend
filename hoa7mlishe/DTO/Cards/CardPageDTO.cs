@@ -20,9 +20,6 @@
         /// </summary>
         public int SortOrder { get; set; }
 
-        /// <summary>
-        /// Номер сезона
-        /// </summary>
-        public int Season { get; set; }
+        public Guid? PackId { get; set; }
     }
 }

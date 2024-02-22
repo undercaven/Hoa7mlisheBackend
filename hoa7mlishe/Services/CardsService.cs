@@ -7,6 +7,9 @@ using System.Security.Cryptography;
 using hoa7mlishe.API.DTO.Cards;
 using hoa7mlishe.API.Database.Models;
 using Microsoft.EntityFrameworkCore;
+using Windows.ApplicationModel;
+using Microsoft.Extensions.FileSystemGlobbing.Internal.PatternContexts;
+using Azure.Identity;
 
 namespace hoa7mlishe.Services
 {
@@ -15,7 +18,7 @@ namespace hoa7mlishe.Services
         private Hoa7mlisheContext _context;
         private IUserRequestService _userRequestService;
         public CardsService(Hoa7mlisheContext context, IUserRequestService userRequestService)
-        { 
+        {
             _context = context;
             _userRequestService = userRequestService;
         }
@@ -63,6 +66,68 @@ namespace hoa7mlishe.Services
             return [.. result.OrderBy(x => x.Price).ThenBy(x => x.Description)];
         }
 
+        public void RemoveCard(User user, Guid cardId, bool shiny, int count)
+        {
+            var card = _context.CollectedCards.SingleOrDefault(x => x.UserId == user.Id && x.CardId == cardId && x.IsShiny == shiny);
+
+            if (card?.Count - count <= 0)
+            {
+                _context.CollectedCards.Remove(card);
+                return;
+            }
+
+            card.Count -= count;
+            _context.Update(card);
+            _context.SaveChanges();
+        }
+
+        public DetailedCardPackDTO GetPackInfoForUser(User user, Guid packID)
+        {
+            var pack = _context.CardPacks.Single(x => x.Id == packID);
+
+            var packDto = new DetailedCardPackDTO()
+            {
+                Id = pack.Id,
+                Description = pack.Description,
+                Price = pack.Price,
+                Tag = pack.Tag,
+                CardCount = pack.CardCount,
+                SeasonId = pack.SeasonId,
+                Hidden = pack.Hidden,
+                PreviewHash = pack.PreviewHash,
+                ShinyCollected = new List<int>(),
+                NormalCollected = new List<int>(),
+                CoverImageId = pack.CoverImageId
+            };
+
+            for (int rarity = 1; rarity <= 6; rarity++)
+            {
+                packDto.ShinyCollected.Add(_context.CollectedCards.Count(x => x.UserId == user.Id && x.Card.Rarity == rarity && x.Card.Tag == pack.Tag && x.IsShiny == true));
+                packDto.NormalCollected.Add(_context.CollectedCards.Count(x => x.UserId == user.Id && x.Card.Rarity == rarity && x.Card.Tag == pack.Tag && x.IsShiny == false));
+            }
+
+            packDto.CardDistrib = [];
+            for (int i = 1; i <= 6; ++i)
+            {
+                packDto.CardDistrib.Add(_context.FileInfos.Count(x => x.Tag == pack.Tag && x.Rarity == i));
+            }
+
+            string[] raritiesStr = pack.CardDistribution.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            raritiesStr = [.. raritiesStr, "1000"];
+
+            packDto.Rarities = new double[raritiesStr.Length];
+
+            packDto.Rarities[0] = double.Parse(raritiesStr[0]) / 10;
+
+            for (int i = 1; i < raritiesStr.Length; i++)
+            {
+                double chanse = (double.Parse(raritiesStr[i]) - double.Parse(raritiesStr[i - 1])) / 10;
+                packDto.Rarities[i] = Math.Round(chanse, 1);
+            }
+
+            return packDto;
+        }
+
         /// <summary>
         /// "Открывает" пак карточек, генерируя случайный набор карточек
         /// </summary>
@@ -70,9 +135,9 @@ namespace hoa7mlishe.Services
         /// <param name="packSize">Размер пака</param>
         /// <param name="userId">Идентификатор пользователя</param>
         /// <returns>Коллекция карточек</returns>
-        public List<CardInfo> GenerateCardPack(int seasonId, int packSize, Guid userId)
+        public List<CardInfoDTO> GenerateCardPack(int seasonId, int packSize, Guid userId)
         {
-            var result = new List<CardInfo>();
+            var result = new List<CardInfoDTO>();
 
             IQueryable<CardInfo> seasonCards;
             if (seasonId != 0)
@@ -95,7 +160,7 @@ namespace hoa7mlishe.Services
 
                 card.IsShiny = RandomNumberGenerator.GetInt32(10) == 9;
 
-                result.Add(card);
+                result.Add(card.GetModel());
                 CardCollected(userId, card);
             }
 
@@ -130,7 +195,7 @@ namespace hoa7mlishe.Services
         /// <param name="user">Пользователь</param>
         /// <param name="packSize">Размер пака</param>
         /// <returns></returns>
-        public List<CardInfo> GenerateCardPack(Guid packId, User user, int packSize = 0)
+        public List<CardInfoDTO> GenerateCardPack(Guid packId, User user, int packSize = 0)
         {
             CardPack pack = _context.CardPacks.FirstOrDefault(x => x.Id == packId);
 
@@ -138,28 +203,28 @@ namespace hoa7mlishe.Services
 
             _userRequestService.UpdateMikoins(user, pack.Price, MikoinUpdateOptions.Subtractive);
 
-            var result = new List<CardInfo>();
+            var result = new List<CardInfoDTO>();
 
             IQueryable<CardInfo> seasonCards = true switch
             {
-                var _ when pack.SeasonId != 0   => _context.FileInfos.Where(x => x.SeasonId == pack.SeasonId),
+                var _ when pack.SeasonId != 0 => _context.FileInfos.Where(x => x.SeasonId == pack.SeasonId),
                 var _ when pack.Tag is not null => _context.FileInfos.Where(x => x.Tag == pack.Tag),
-                _                               => _context.FileInfos,
+                _ => _context.FileInfos,
             };
 
             int cardCount = packSize == 0 ? pack.CardCount : packSize;
 
             for (int i = 0; i < cardCount; i++)
-             {
+            {
                 int rarity = GetRarity(pack.CardDistribution);
                 List<CardInfo> suitableFiles = [.. seasonCards.Where(x => x.Rarity == rarity)];
                 int r = RandomNumberGenerator.GetInt32(suitableFiles.Count);
 
                 CardInfo card = suitableFiles[r].Clone();
-                 
+
                 card.IsShiny = RandomNumberGenerator.GetInt32(9) == 8;
 
-                result.Add(card);
+                result.Add(card.GetModel());
                 CardCollected(user.Id, card);
             }
 
@@ -171,10 +236,17 @@ namespace hoa7mlishe.Services
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public int GetCardCount(Guid userId)
+        public int GetCardCount(Guid userId, Guid? packId)
         {
             var user = _context.Users.First(x => x.Id == userId);
-            return _context.CollectedCards.Count(x => x.UserId == userId);
+
+            if (packId is null)
+            {
+                return _context.CollectedCards.Count(x => x.UserId == userId);
+            }
+
+            var pack = _context.CardPacks.First(x => x.Id == packId);
+            return _context.CollectedCards.Count(x => x.UserId == userId && x.Card.Tag == pack.Tag);
         }
 
         public List<CardInfo> GetAllCards()
@@ -239,9 +311,10 @@ namespace hoa7mlishe.Services
                 cardsDto.Add(cardDto);
             }
 
-            if (cardPage.Season != 0)
+            if (cardPage.PackId is not null)
             {
-                cardsDto = cardsDto.Where(x => x.CardInfo.SeasonId == cardPage.Season).ToList();
+                var pack = _context.CardPacks.First(x => x.Id == cardPage.PackId);
+                cardsDto = cardsDto.Where(x => x.CardInfo.Tag == pack.Tag).ToList();
             }
 
             switch (cardPage.SortOrder)
@@ -278,8 +351,8 @@ namespace hoa7mlishe.Services
         public void CardCollected(Guid userId, CardInfo card, int count = 1)
         {
             var collectedRecord = _context.CollectedCards.Where(
-                x => x.UserId == userId 
-                && x.CardId == card.Id 
+                x => x.UserId == userId
+                && x.CardId == card.Id
                 && x.IsShiny == card.IsShiny
             ).FirstOrDefault();
 
@@ -292,6 +365,7 @@ namespace hoa7mlishe.Services
 
             collectedRecord = new CollectedCard()
             {
+                Id = Guid.NewGuid(),
                 CardId = card.Id,
                 UserId = userId,
                 Count = count,
@@ -305,6 +379,36 @@ namespace hoa7mlishe.Services
         public List<string> GetAllTags()
         {
             return _context.FileInfos.Select(x => x.Tag).Distinct().ToList();
+        }
+
+        public CardInfoDTO CreateUltimate(User user, Guid packId, int count, bool shiny)
+        {
+            var pack = _context.CardPacks.First(x => x.Id == packId);
+
+            var userCollectedCards = _context.CollectedCards.Where(x => x.UserId == user.Id && x.Card.Tag == pack.Tag && x.IsShiny == shiny && x.Card.Rarity <= 5).ToList();
+
+            if (userCollectedCards.Any(u => u.Count < count))
+            {
+                throw new InvalidOperationException("POOPIE");
+            }
+
+            var cardsInPack = _context.FileInfos.Where(x => x.Tag == pack.Tag && x.Rarity <= 5).ToList();
+           
+            if (cardsInPack.Any(c => !userCollectedCards.Any(u => u.CardId == c.Id)))
+            {
+                throw new InvalidOperationException("POOPIE");
+            }
+
+            foreach (var card in userCollectedCards)
+            {
+                RemoveCard(user, card.CardId, shiny, count);
+            }
+
+            var newCard = _context.FileInfos.Single(x => x.Tag == pack.Tag && x.Rarity == 6);
+            newCard.IsShiny = shiny;
+            CardCollected(user.Id, newCard);
+
+            return newCard.GetModel();
         }
     }
 }

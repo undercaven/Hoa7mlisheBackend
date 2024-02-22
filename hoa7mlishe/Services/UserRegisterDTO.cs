@@ -8,16 +8,16 @@
         /// <summary>
         /// Пароль
         /// </summary>
-        public string Password { get; internal set; }
+        public string Password { get; set; }
 
         /// <summary>
         /// Логин
         /// </summary>
-        public string Login { get; internal set; }
+        public string Login { get; set; }
 
         /// <summary>
         /// Имя пользователя
         /// </summary>
-        public string Username { get; internal set; }
+        public string Username { get; set; }
     }
 }

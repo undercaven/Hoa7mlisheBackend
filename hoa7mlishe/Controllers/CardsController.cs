@@ -34,7 +34,7 @@ namespace hoa7mlishe.API.Controllers
         /// </summary>
         /// <param name="packId">ID пака</param>
         /// <returns>ИД и описание файла</returns>
-        [HttpGet]
+        [HttpPost]
         public IActionResult GetRandomCard(
             [FromQuery] Guid packId)
         {
@@ -56,20 +56,62 @@ namespace hoa7mlishe.API.Controllers
             return Ok(_cardsService.GetPacks(user.Role));
         }
 
-        /// <summary>
-        /// Возвращает информацию о конкретном паке карт
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet("packs/info/{packId}")]
-        [AllowAnonymous]
-        public IActionResult GetPackInfo(Guid packId) => Ok(_context.CardPacks.Single(x => x.Id == packId));
+        [HttpPost("createUltimate/{packId}")]
+        public IActionResult CreateUltimate(Guid packId, int count, bool shiny)
+        {
+            User user = _userRequestService.GetUser(User.Identity);
 
-        /// <summary>
-        /// Возвращает случайные карты для пака
-        /// </summary>
-        /// <param name="packId">Идентификатор пака</param>
-        /// <returns>Массив сгенерированных карточек</returns>
-        [HttpGet("packs/{packId}")]
+            if (user is null) return Unauthorized();
+            try
+            {
+                var cardId = _cardsService.CreateUltimate(user, packId, count, shiny);
+                return Ok(cardId);
+
+            }
+            catch (InvalidDataException)
+            {
+                return Conflict();
+            }
+        }
+
+            /// <summary>
+            /// Возвращает информацию о конкретном паке карт
+            /// </summary>
+            /// <returns></returns>
+            [HttpGet("packs/info/{packId}")]
+        public IActionResult GetPackInfo(Guid packId)
+        {
+            User user = _userRequestService.GetUser(User.Identity);
+
+            if (user is null)
+            {
+                return Unauthorized();
+            }
+
+            var result = _cardsService.GetPackInfoForUser(user, packId);
+
+            return Ok(result);
+        }
+
+        [HttpGet("packs/info/{packId}/getcards")]
+        public IActionResult GetPackCards(Guid packId)
+        {
+            User user = _userRequestService.GetUser(User.Identity);
+            if (user is null)
+            {
+                return Unauthorized();
+            }
+
+            var pack = _context.CardPacks.Single(x => x.Id == packId);
+            return Ok(_context.FileInfos.Where(x => x.Tag == pack.Tag).Select(x => x.GetModel()).ToList());
+        }
+
+            /// <summary>
+            /// Возвращает случайные карты для пака
+            /// </summary>
+            /// <param name="packId">Идентификатор пака</param>
+            /// <returns>Массив сгенерированных карточек</returns>
+            [HttpPost("packs/{packId}")]
         public IActionResult GetCardPack(
             Guid packId)
         {
@@ -82,11 +124,12 @@ namespace hoa7mlishe.API.Controllers
 
             try
             {
-                List<CardInfo> cardPack = _cardsService.GenerateCardPack(packId, user);
+                List<CardInfoDTO> cardPack = _cardsService.GenerateCardPack(packId, user);
                 return Ok(cardPack);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error while generating card pack");
                 return Conflict();
             }
         }
@@ -106,7 +149,7 @@ namespace hoa7mlishe.API.Controllers
         /// <returns></returns>
         [HttpGet("collected/{userId}/count/")]
         [AllowAnonymous]
-        public IActionResult GetCollectedCards(Guid userId) => Ok(_cardsService.GetCardCount(userId));
+        public IActionResult GetCollectedCards(Guid userId, Guid? packId) => Ok(_cardsService.GetCardCount(userId, packId));
 
         /// <summary>
         /// Возвращает карточки на n-ой странице
@@ -123,14 +166,14 @@ namespace hoa7mlishe.API.Controllers
             int page,
             int pageSize,
             int sortOrder,
-            int season)
+            Guid? packId)
         {
             var cardPage = new CardPageDto()
             {
                 Page = page,
                 PageSize = pageSize,
                 SortOrder = sortOrder,
-                Season = season
+                PackId = packId
             };
             
             var response = _cardsService.GetPageOfCards(userId, cardPage);

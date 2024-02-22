@@ -88,11 +88,11 @@ internal class Program
 
         ServerServices.SetServiceContainer(new AppServiceContainer());
 
-        builder.Services.AddTransient<IMailService, MailService>();
-        builder.Services.AddTransient<ICardsService, CardsService>();
-        builder.Services.AddTransient<IUserRequestService, UserRequestService>();
-        builder.Services.AddTransient<ITradesService, TradesService>();
-        builder.Services.AddTransient<IFileService, FileService>();
+        builder.Services.AddScoped<IMailService, MailService>();
+        builder.Services.AddScoped<ICardsService, CardsService>();
+        builder.Services.AddScoped<IUserRequestService, UserRequestService>();
+        builder.Services.AddScoped<ITradesService, TradesService>();
+        builder.Services.AddScoped<IFileService, FileService>();
 
         builder.Services.AddSignalR();
         builder.Services.AddLogging();
