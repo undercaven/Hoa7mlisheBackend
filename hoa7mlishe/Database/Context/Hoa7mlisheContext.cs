@@ -37,12 +37,11 @@ public partial class Hoa7mlisheContext : DbContext
     public virtual DbSet<TradeOffer> TradeOffers { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#if DEBUG
-                => optionsBuilder.UseSqlServer("Server=.\\HOASERVER_DEV;Database=Hoa7mlishe;User Id=sa;Password=chuchikmuchik;TrustServerCertificate=true", x => x.UseHierarchyId());
-#else
-        => optionsBuilder.UseSqlServer("Server=localhost\\HOASERVER_PROD; Database = Hoa7mlishe; TrustServerCertificate=True; Trusted_Connection = True; User Id=sa; Password=123asd123;", x => x.UseHierarchyId());
-#endif
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=.\\HOASERVER_DEV;Database=Hoa7mlishe;User Id=sa;Password=chuchikmuchik;TrustServerCertificate=true", x => x.UseHierarchyId());
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("SQL_Latin1_General_CP1_CI_AS");
@@ -58,11 +57,11 @@ public partial class Hoa7mlisheContext : DbContext
 
             entity.HasOne(d => d.Card).WithMany(p => p.CollectedCards)
                 .HasForeignKey(d => d.CardId)
-                .HasConstraintName("FK_CollectedCards_FileInfos");
+                .HasConstraintName("FK_CollectedCards_FileInfos1");
 
             entity.HasOne(d => d.User).WithMany(p => p.CollectedCards)
                 .HasForeignKey(d => d.UserId)
-                .HasConstraintName("FK_CollectedCards_Users");
+                .HasConstraintName("FK_CollectedCards_Users1");
         });
 
         modelBuilder.Entity<DeathClock>(entity =>

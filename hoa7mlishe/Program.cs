@@ -98,13 +98,20 @@ internal class Program
         builder.Services.AddLogging();
 
         builder.Services.AddDbContext<Hoa7mlisheContext>();
+#if DEBUG
+        builder.WebHost.UseUrls("http://26.85.180.83:6969");
+#else
         builder.WebHost.UseUrls("http://localhost:76/");
+#endif
         var app = builder.Build();
-        // Configure the HTTP request pipeline.
+
+        if (app.Environment.IsDevelopment())
+        {
             app.UseSwagger();
             app.UseSwaggerUI();
+        }
 
-        app.UseCors("CorsPolicy");
+            app.UseCors("CorsPolicy");
         app.MapHub<TradesHub>("/trades");
 
         app.UseForwardedHeaders(new ForwardedHeadersOptions

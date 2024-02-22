@@ -37,7 +37,7 @@ namespace hoa7mlishe.API.Controllers
         /// <param name="tokenInfo">Токены пользователя</param>
         /// <returns>Новая пара токенов</returns>
         [AllowAnonymous]
-        [HttpGet("refreshToken")]
+        [HttpPost("refreshToken")]
         public IActionResult RefreshToken(TokenApiDTO tokenInfo)
         {
             var newTokens = _userRequestService.UpdateRefreshToken(tokenInfo);

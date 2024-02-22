@@ -15,7 +15,7 @@ namespace hoa7mlishe.API.DTO.Cards
         /// <summary>
         /// Модель карточки
         /// </summary>
-        public CardInfo CardInfo { get; set; }
+        public CardInfoDTO CardInfo { get; set; }
 
         /// <summary>
         /// Признак блестящей карточки

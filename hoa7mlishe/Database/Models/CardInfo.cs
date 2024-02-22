@@ -35,7 +35,22 @@ public partial class CardInfo
     public virtual ICollection<TradeContent> TradeContents { get; set; } = new List<TradeContent>();
 
     [NotMapped]
-    internal bool IsShiny { get; set; }
+    public bool IsShiny { get; set; }
 
-    internal CardInfo? Clone() => MemberwiseClone() as CardInfo;
+    public CardInfo Clone() => this.MemberwiseClone() as CardInfo;
+
+    public CardInfoDTO GetModel() => new()
+    {
+        Id = this.Id,
+        Tag = this.Tag,
+        Description = this.Description,
+        Rarity = this.Rarity,
+        Width = this.Width,
+        Height = this.Height,
+        SeasonId = this.SeasonId,
+        PreviewHash = this.PreviewHash,
+        FileId = this.FileId,
+        LayerOne = this.LayerOne,
+        IsShiny = this.IsShiny
+    };
 }

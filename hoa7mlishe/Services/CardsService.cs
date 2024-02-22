@@ -6,6 +6,7 @@ using hoa7mlishe.Hoa7Enums;
 using System.Security.Cryptography;
 using hoa7mlishe.API.DTO.Cards;
 using hoa7mlishe.API.Database.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace hoa7mlishe.Services
 {
@@ -216,7 +217,10 @@ namespace hoa7mlishe.Services
         public List<CollectedCardsDTO> GetPageOfCards(Guid userId, CardPageDto cardPage)
         {
             List<CollectedCard> cards =
-                _context.CollectedCards.Where(x => x.UserId == userId).ToList();
+                _context.CollectedCards.Where(x => x.UserId == userId)
+                .Include(x => x.Card)
+                .Include(x => x.User)
+                .ToList();
 
             var cardsDto = new List<CollectedCardsDTO>();
 
@@ -227,7 +231,7 @@ namespace hoa7mlishe.Services
                 var cardDto = new CollectedCardsDTO()
                 {
                     Count = card.Count,
-                    CardInfo = card.Card.Clone(),
+                    CardInfo = card.Card.GetModel(),
                     IsShiny = isShiny
                 };
 
