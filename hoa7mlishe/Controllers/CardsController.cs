@@ -56,6 +56,13 @@ namespace hoa7mlishe.API.Controllers
             return Ok(_cardsService.GetPacks(user.Role));
         }
 
+        /// <summary>
+        /// Создает ультимтивную карточку для пака, если у пользователя есть все карточки редкостей 1-5
+        /// </summary>
+        /// <param name="packId">id пака карточек</param>
+        /// <param name="count">количество создаваемых карточек</param>
+        /// <param name="shiny">индикатор блестящей карточки</param>
+        /// <returns></returns>
         [HttpPost("createUltimate/{packId}")]
         public IActionResult CreateUltimate(Guid packId, int count, bool shiny)
         {
@@ -93,6 +100,11 @@ namespace hoa7mlishe.API.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Возвращает все карточки, содержащиеся в паке
+        /// </summary>
+        /// <param name="packId">id пака</param>
+        /// <returns></returns>
         [HttpGet("packs/info/{packId}/getcards")]
         public IActionResult GetPackCards(Guid packId)
         {
@@ -103,15 +115,15 @@ namespace hoa7mlishe.API.Controllers
             }
 
             var pack = _context.CardPacks.Single(x => x.Id == packId);
-            return Ok(_context.FileInfos.Where(x => x.Tag == pack.Tag).Select(x => x.GetModel()).ToList());
+            return Ok(_context.FileInfos.Where(x => x.Tag == pack.Tag).OrderBy(x => x.Rarity).Select(x => x.GetModel()).ToList());
         }
 
-            /// <summary>
-            /// Возвращает случайные карты для пака
-            /// </summary>
-            /// <param name="packId">Идентификатор пака</param>
-            /// <returns>Массив сгенерированных карточек</returns>
-            [HttpPost("packs/{packId}")]
+        /// <summary>
+        /// Открывает пак карточек
+        /// </summary>
+        /// <param name="packId">Идентификатор пака</param>
+        /// <returns>Массив сгенерированных карточек</returns>
+        [HttpPost("packs/{packId}")]
         public IActionResult GetCardPack(
             Guid packId)
         {

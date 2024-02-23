@@ -73,7 +73,7 @@ namespace hoa7mlishe.API.Authorization.Helpers
             var result = new TokenApiDTO()
             {
                 AccessToken = new JwtSecurityTokenHandler().WriteToken(jwt),
-                RefreshToken = GenerateRefreshToken(),
+                RefreshToken = user.RefreshToken,
             };
 
             return result;

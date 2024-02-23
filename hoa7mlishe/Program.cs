@@ -99,7 +99,7 @@ internal class Program
 
         builder.Services.AddDbContext<Hoa7mlisheContext>();
 #if DEBUG
-        builder.WebHost.UseUrls("http://26.85.180.83:6969");
+        builder.WebHost.UseUrls("http://localhost:6969");
 #else
         builder.WebHost.UseUrls("http://localhost:76/");
 #endif
